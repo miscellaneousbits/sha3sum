@@ -1,7 +1,7 @@
 CC=gcc
 INSTALL=install
 prefix=/usr/local
-CFLAGS=-Wall -ggdb -O2 -I.
+CFLAGS=-Wall -O3 -I.
 LDFLAGS=
 
 .PHONY : all test clean 
@@ -27,4 +27,4 @@ sha3sum: sha3.o sha3sum.o
 	$(CC) -o $@ $^ ${LDFLAGS}
 
 clean:
-	-rm -f *.o sha3test
+	-rm -f *.o sha3test sha3sum
