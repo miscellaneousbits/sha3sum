@@ -1,40 +1,18 @@
-#include <fcntl.h>
 #include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "sha3.h"
 
 static void help(const char *argv0) {
-    printf("To call: %s -b 256|384|512 [-k]\n", argv0);
+    fprintf(stderr, "Usage: %s -b 256|384|512 [-k]\n", argv0);
     exit(-1);
-}
-
-static void byte_to_hex(uint8_t b, char s[23]) {
-    unsigned i=1;
-    s[0] = s[1] = '0';
-    s[2] = '\0';
-    while(b) {
-        unsigned t = b & 0x0f;
-        if (t < 10)
-            s[i] = '0' + t;
-        else
-            s[i] = 'a' + t - 10;
-        i--;
-        b >>= 4;
-    }
 }
 
 int main(int argc, char *argv[])
 {
-    sha3_context c;
-    const uint8_t *hash;
-    unsigned i;
     unsigned use_keccak = 0;
     unsigned bit_size = 0;
 
@@ -46,7 +24,6 @@ int main(int argc, char *argv[])
         {
         case 'h':
             help(argv[0]);
-            exit(0);
         case 'k':
             use_keccak = 1;
             break;
@@ -74,6 +51,8 @@ int main(int argc, char *argv[])
         help(argv[0]);
     }
 
+    sha3_context c;
+
     switch (bit_size)
     {
     case 256:
@@ -90,27 +69,23 @@ int main(int argc, char *argv[])
     if( use_keccak ) {
         enum SHA3_FLAGS flags2 = sha3_SetFlags(&c, SHA3_FLAGS_KECCAK);
         if( flags2 != SHA3_FLAGS_KECCAK )  {
-            printf("Failed to set Keccak mode");
-            return 2;
+            fprintf(stderr, "Failed to set Keccak mode.\n");
+            exit(-1);
         }
     }
 
-    char b[256];
-    for (;;)
+    char b[1024];
+    size_t l = fread(b, 1, sizeof(b), stdin);
+    while (l)
     {
-        size_t l = fread(b, 1, sizeof(b), stdin);
-        if (l == 0)
-            break;
         sha3_Update(&c, b, l);
+        l = fread(b, 1, sizeof(b), stdin);
     }
-    hash = sha3_Finalize(&c);
+    const uint8_t* hash = sha3_Finalize(&c);
 
+    unsigned i;
     for (i = 0; i < bit_size / 8; i++)
-    {
-        char s[3];
-        byte_to_hex(hash[i], s);
-        printf("%s", s);
-    }
+        printf("%02x", hash[i]);
     printf("\n");
 
     return 0;

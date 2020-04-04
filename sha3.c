@@ -8,34 +8,23 @@
  * This flag is used to configure "pure" Keccak, as opposed to NIST SHA3.
  */
 #define SHA3_USE_KECCAK_FLAG 0x80000000
-#define SHA3_CW(x) ((x) & (~SHA3_USE_KECCAK_FLAG))
 
-
-#if defined(_MSC_VER)
-#define SHA3_CONST(x) x
-#else
-#define SHA3_CONST(x) x##L
-#endif
 
 #ifndef SHA3_ROTL64
 #define SHA3_ROTL64(x, y) \
 	(((x) << (y)) | ((x) >> ((sizeof(uint64_t)*8) - (y))))
 #endif
 
-static const uint64_t keccakf_rndc[24] = {
-    SHA3_CONST(0x0000000000000001UL), SHA3_CONST(0x0000000000008082UL),
-    SHA3_CONST(0x800000000000808aUL), SHA3_CONST(0x8000000080008000UL),
-    SHA3_CONST(0x000000000000808bUL), SHA3_CONST(0x0000000080000001UL),
-    SHA3_CONST(0x8000000080008081UL), SHA3_CONST(0x8000000000008009UL),
-    SHA3_CONST(0x000000000000008aUL), SHA3_CONST(0x0000000000000088UL),
-    SHA3_CONST(0x0000000080008009UL), SHA3_CONST(0x000000008000000aUL),
-    SHA3_CONST(0x000000008000808bUL), SHA3_CONST(0x800000000000008bUL),
-    SHA3_CONST(0x8000000000008089UL), SHA3_CONST(0x8000000000008003UL),
-    SHA3_CONST(0x8000000000008002UL), SHA3_CONST(0x8000000000000080UL),
-    SHA3_CONST(0x000000000000800aUL), SHA3_CONST(0x800000008000000aUL),
-    SHA3_CONST(0x8000000080008081UL), SHA3_CONST(0x8000000000008080UL),
-    SHA3_CONST(0x0000000080000001UL), SHA3_CONST(0x8000000080008008UL)
-};
+
+static const uint64_t keccakf_rndc[24] = {0x0000000000000001ULL,
+    0x0000000000008082ULL, 0x800000000000808aULL, 0x8000000080008000ULL,
+    0x000000000000808bULL, 0x0000000080000001ULL, 0x8000000080008081ULL,
+    0x8000000000008009ULL, 0x000000000000008aULL, 0x0000000000000088ULL,
+    0x0000000080008009ULL, 0x000000008000000aULL, 0x000000008000808bULL,
+    0x800000000000008bULL, 0x8000000000008089ULL, 0x8000000000008003ULL,
+    0x8000000000008002ULL, 0x8000000000000080ULL, 0x000000000000800aULL,
+    0x800000008000000aULL, 0x8000000080008081ULL, 0x8000000000008080ULL,
+    0x0000000080000001ULL, 0x8000000080008008ULL};
 
 static const unsigned keccakf_rotc[24] = {
     1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62,
@@ -121,8 +110,7 @@ void sha3_Init512(sha3_context* ctx)
 enum SHA3_FLAGS sha3_SetFlags(sha3_context* ctx, enum SHA3_FLAGS flags)
 {
     flags &= SHA3_FLAGS_KECCAK;
-    ctx->capacityWords |=
-        (flags == SHA3_FLAGS_KECCAK ? SHA3_USE_KECCAK_FLAG : 0);
+    ctx->flags |= (flags == SHA3_FLAGS_KECCAK ? SHA3_USE_KECCAK_FLAG : 0);
     return flags;
 }
 
@@ -157,8 +145,7 @@ void sha3_Update(sha3_context* ctx, void const* bufIn, size_t len)
         ctx->s[ctx->wordIndex] ^= ctx->saved;
         ctx->byteIndex = 0;
         ctx->saved = 0;
-        if (++ctx->wordIndex ==
-            (SHA3_KECCAK_SPONGE_WORDS - SHA3_CW(ctx->capacityWords)))
+        if (++ctx->wordIndex == (SHA3_KECCAK_SPONGE_WORDS - ctx->capacityWords))
         {
             keccakf(ctx->s);
             ctx->wordIndex = 0;
@@ -178,8 +165,7 @@ void sha3_Update(sha3_context* ctx, void const* bufIn, size_t len)
             ((uint64_t)(buf[4]) << 8 * 4) | ((uint64_t)(buf[5]) << 8 * 5) |
             ((uint64_t)(buf[6]) << 8 * 6) | ((uint64_t)(buf[7]) << 8 * 7);
         ctx->s[ctx->wordIndex] ^= t;
-        if (++ctx->wordIndex ==
-            (SHA3_KECCAK_SPONGE_WORDS - SHA3_CW(ctx->capacityWords)))
+        if (++ctx->wordIndex == (SHA3_KECCAK_SPONGE_WORDS - ctx->capacityWords))
         {
             keccakf(ctx->s);
             ctx->wordIndex = 0;
@@ -206,15 +192,15 @@ void const* sha3_Finalize(sha3_context* ctx)
 
     uint64_t t;
 
-    if (ctx->capacityWords & SHA3_USE_KECCAK_FLAG) /* Keccak version */
+    if (ctx->flags & SHA3_USE_KECCAK_FLAG) /* Keccak version */
         t = (uint64_t)(((uint64_t)1) << (ctx->byteIndex * 8));
     else /* SHA3 version */
         t = (uint64_t)(((uint64_t)(0x02 | (1 << 2))) << ((ctx->byteIndex) * 8));
 
     ctx->s[ctx->wordIndex] ^= ctx->saved ^ t;
 
-    ctx->s[SHA3_KECCAK_SPONGE_WORDS - SHA3_CW(ctx->capacityWords) - 1] ^=
-        SHA3_CONST(0x8000000000000000UL);
+    ctx->s[SHA3_KECCAK_SPONGE_WORDS - ctx->capacityWords - 1] ^=
+        0x8000000000000000ULL;
     keccakf(ctx->s);
 
     /* Return first bytes of the ctx->s. This conversion is not needed for

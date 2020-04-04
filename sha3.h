@@ -17,6 +17,7 @@ typedef struct sha3_context_ {
                                  * (starts from 0) */
     unsigned capacityWords;     /* the double size of the hash output in
                                  * words (e.g. 16 for Keccak 512) */
+    unsigned flags;
 } sha3_context;
 
 enum SHA3_FLAGS {
