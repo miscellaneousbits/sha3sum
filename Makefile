@@ -1,7 +1,7 @@
 CC=gcc
 INSTALL=install
 prefix=/usr/local
-CFLAGS=-Wall -O3 -I.
+CFLAGS=-Wall -O3
 LDFLAGS=
 
 .PHONY : all test clean 
