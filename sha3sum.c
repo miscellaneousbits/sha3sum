@@ -11,7 +11,7 @@
 #include "sha3.h"
 
 static void help(const char *argv0) {
-    printf("To call: %s 256|384|512 [-k] (-f file_path | string).\n", argv0);
+    printf("To call: %s -b 256|384|512 [-k]\n", argv0);
     exit(-1);
 }
 
@@ -34,19 +34,14 @@ int main(int argc, char *argv[])
 {
     sha3_context c;
     const uint8_t *hash;
-    unsigned bit_size;
-    const char* file_path = NULL;
-    int fd;
-    struct stat st;
-    void* p = NULL;
     unsigned i;
     unsigned use_keccak = 0;
-    unsigned use_file = 0;
+    unsigned bit_size = 0;
 
     opterr = 0;
     int oc;
 
-    while ((oc = getopt(argc, argv, "hkf:")) != -1)
+    while ((oc = getopt(argc, argv, "hkb:")) != -1)
         switch (oc)
         {
         case 'h':
@@ -55,12 +50,11 @@ int main(int argc, char *argv[])
         case 'k':
             use_keccak = 1;
             break;
-        case 'f':
-            use_file = 1;
-            file_path = optarg;
+        case 'b':
+            bit_size = atoi(optarg);
             break;
         case '?':
-            if (optopt == 'f')
+            if (optopt == 'b')
                 fprintf(stderr, "Option -%c requires an argument.\n", optopt);
             else
                 fprintf(stderr, "Unknown option `-%c'.\n", optopt);
@@ -69,17 +63,6 @@ int main(int argc, char *argv[])
             abort();
         }
 
-    // parse positionals
-
-    if (optind >= argc)
-    {
-        fprintf(
-            stderr, "Bit size must be specified as either 256, 384 or 512\n");
-        help(argv[0]);
-    }
-
-    bit_size = atoi(argv[optind++]);
-
     switch (bit_size)
     {
     case 256:
@@ -87,46 +70,8 @@ int main(int argc, char *argv[])
     case 512:
         break;
     default:
+        fprintf(stderr, "Bit size must be 256, 384 or 512.\n");
         help(argv[0]);
-    }
-
-    if (!use_file)
-    {
-        if (optind < argc)
-        {
-            p = strdup(argv[optind]);
-            st.st_size = (loff_t)strlen(p);
-        }
-        else
-        {
-            fprintf(stderr, "Either file path or string must be specified.\n");
-            help(argv[0]);
-        }
-    }
-    else
-    {
-        fd = open(file_path, O_RDONLY);
-        if (fd == -1)
-        {
-            printf("Cannot open file '%s' for reading", file_path);
-            return 2;
-        }
-        i = fstat(fd, &st);
-        if (i)
-        {
-            close(fd);
-            printf("Cannot determine the size of file '%s'", file_path);
-            return 2;
-        }
-
-        p = malloc(st.st_size);
-        if (p == NULL)
-        {
-            printf("Cannot memory-map file '%s'", file_path);
-            return 2;
-        }
-        read(fd, p, st.st_size);
-        close(fd);
     }
 
     switch (bit_size)
@@ -149,10 +94,16 @@ int main(int argc, char *argv[])
             return 2;
         }
     }
-    sha3_Update(&c, p, st.st_size);
-    hash = sha3_Finalize(&c);
 
-    free(p);
+    char b[256];
+    for (;;)
+    {
+        size_t l = fread(b, 1, sizeof(b), stdin);
+        if (l == 0)
+            break;
+        sha3_Update(&c, b, l);
+    }
+    hash = sha3_Finalize(&c);
 
     for (i = 0; i < bit_size / 8; i++)
     {
