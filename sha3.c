@@ -4,6 +4,8 @@
 
 #include "sha3.h"
 
+unsigned debug = 0;
+
 /* 
  * This flag is used to configure "pure" Keccak, as opposed to NIST SHA3.
  */
@@ -45,8 +47,15 @@ keccakf(uint64_t s[25])
     int i, j, round;
     uint64_t t, bc[5];
 #define KECCAK_ROUNDS 24
-
     for(round = 0; round < KECCAK_ROUNDS; round++) {
+    if (debug)
+    {
+		char* sb = (char*)s;
+	    printf("round in: ");
+		for (i = 0; i < 1600 / 8; i++)
+			printf("%02x", sb[i]);
+		printf("\n");
+	}
 
         /* Theta */
         for(i = 0; i < 5; i++)
@@ -77,6 +86,14 @@ keccakf(uint64_t s[25])
 
         /* Iota */
         s[0] ^= keccakf_rndc[round];
+    if (debug)
+    {
+		char* sb = (char*)s;
+	    printf("round out: ");
+		for (i = 0; i < 1600 / 8; i++)
+			printf("%02x", sb[i]);
+		printf("\n\n");
+	}
     }
 }
 
@@ -198,23 +215,24 @@ void const* sha3_Finalize(sha3_context* ctx)
         t = (uint64_t)(((uint64_t)(0x02 | (1 << 2))) << ((ctx->byteIndex) * 8));
 
     ctx->s[ctx->wordIndex] ^= ctx->saved ^ t;
-
     ctx->s[SHA3_KECCAK_SPONGE_WORDS - ctx->capacityWords - 1] ^=
         0x8000000000000000ULL;
+    if (debug)
+    {
+        printf("pad: ");
+        for (unsigned i = 0;
+             i <
+             (SHA3_KECCAK_SPONGE_WORDS - ctx->capacityWords) * sizeof(uint64_t);
+             i++)
+            printf("%02x", ctx->sb[i]);
+        printf("\n");
+    }
     keccakf(ctx->s);
 
-    /* Return first bytes of the ctx->s. This conversion is not needed for
-     * little-endian platforms e.g. wrap with #if !defined(__BYTE_ORDER__)
-     * || !defined(__ORDER_LITTLE_ENDIAN__) ||
-     * __BYTE_ORDER__!=__ORDER_LITTLE_ENDIAN__
-     *    ... the conversion below ...
-     * #endif */
-
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-    for (i = 0; i < SHA3_KECCAK_SPONGE_WORDS; i++)
+    for (unsigned i = 0; i < SHA3_KECCAK_SPONGE_WORDS - ctx->capacityWords; i++)
     {
         const unsigned t1 = (uint32_t)ctx->s[i];
-        const unsigned t2 = (uint32_t)((ctx->s[i] >> 16) >> 16);
+        const unsigned t2 = (uint32_t)(ctx->s[i] >> 32);
         ctx->sb[i * 8 + 0] = (uint8_t)(t1);
         ctx->sb[i * 8 + 1] = (uint8_t)(t1 >> 8);
         ctx->sb[i * 8 + 2] = (uint8_t)(t1 >> 16);
@@ -224,7 +242,6 @@ void const* sha3_Finalize(sha3_context* ctx)
         ctx->sb[i * 8 + 6] = (uint8_t)(t2 >> 16);
         ctx->sb[i * 8 + 7] = (uint8_t)(t2 >> 24);
     }
-#endif
 
     return (ctx->sb);
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+extern unsigned debug;
+
 /* 'Words' here refers to uint64_t */
 #define SHA3_KECCAK_SPONGE_WORDS \
 	(((1600)/8/*bits to byte*/)/sizeof(uint64_t))
@@ -8,8 +10,8 @@ typedef struct sha3_context_ {
     uint64_t saved;             /* the portion of the input message that we
                                  * didn't consume yet */
     union {                     /* Keccak's state */
-        uint64_t s[SHA3_KECCAK_SPONGE_WORDS];
-        uint8_t sb[SHA3_KECCAK_SPONGE_WORDS * 8];
+        uint64_t s[1600 / 64];
+        uint8_t sb[1600 / 8];
     };
     unsigned byteIndex;         /* 0..7--the next byte after the set one
                                  * (starts from 0; 0--none are buffered) */
